@@ -87,11 +87,37 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
 const Status BufMgr::unPinPage(File* file, const int PageNo, 
 			       const bool dirty) 
 {
+    //David Wolske's Section.
+    Status unpinPageStatus = OK;
+    int unPinFrameNo;
 
+    // Check if (file,pageNo) is currently in the buffer pool (ie. in
+    // the hash table.  If so, return the corresponding frameNo via the frameNo
+    // parameter.  Else, return HASHNOTFOUND
+    unpinPageStatus = hashTable->lookup(file, pageNo, unPinFrameNo);
 
+    if (unpinPageStatus != OK) {
+        //Returns: HASHNOTFOUND if the page is not in the buffer pool hash table, 
+        return HASHNOTFOUND;
+    }
 
+    //bufTable[frameNo].Clear(); format I used for accessing pinCnt and dirty.
 
+    if (bufTable[unPinFrameNo].pinCnt == 0) {
+        //Returns: PAGENOTPINNED if the pin count is already 0.
+        return PAGENOTPINNED;
+    } else {
+        //Decrements the pinCnt of the frame containing (file, PageNo)
+        bufTable[unPinFrameNo].pinCnt--;
+    }
 
+    if (dirty) {
+        //if dirty == true, sets the dirty bit.
+        bufTable[unPinFrameNo].dirty = true;
+    }
+ 
+    //Returns: OK if no errors occurred,
+    return OK;
 }
 
 const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page) 
