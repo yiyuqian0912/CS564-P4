@@ -62,16 +62,46 @@ BufMgr::~BufMgr() {
     delete [] bufPool;
 }
 
-
 const Status BufMgr::allocBuf(int & frame) 
 {
+    int startHand = clockHand; // Save the starting point
 
+    do {
+        BufDesc &buf = bufTable[clockHand]; // Current candidate frame
 
+        if (buf.refbit) {
+            buf.refbit = false;
+        } else if (buf.pinCnt == 0) { // Unppinned frame found
+            found = true;
+            frame = clockHand; // Store the allocated frame number
 
+            if (buf.valid) {
+                hashTable.remove(buf.file, buf.pageNo);
 
+                if (buf.dirty) { // Write the dirty page to disk
+                    if (buf.file->writePage(buf->pageNo, &(bufPool[frame])) != OK) {
+                        return UNIXERR;
+                    }
+                    buf.dirty = false;
+                }
+            }
+            buf.Clear();
+            advanceClock();
+            return OK;
+        }
 
+        advanceClock();
+    } while (clockHand != startHand);
+
+    return BUFFEREXCEEDED;
 
 }
+
+
+
+
+
+
 
 	
 const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
