@@ -72,11 +72,11 @@ const Status BufMgr::allocBuf(int & frame)
         if (buf.refbit) {
             buf.refbit = false;
         } else if (buf.pinCnt == 0) { // Unppinned frame found
-            found = true;
+            //found = true;
             frame = clockHand; // Store the allocated frame number
 
             if (buf.valid) {
-                hashTable.remove(buf.file, buf.pageNo);
+                hashTable->remove(buf.file, buf.pageNo);
 
                 if (buf.dirty) { // Write the dirty page to disk
                     if (buf.file->writePage(buf->pageNo, &(bufPool[frame])) != OK) {
@@ -123,8 +123,8 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
       Page* pg;
       status = file->readPage(PageNo, pg); 
       if (status == HASHNOTFOUND) return UNIXERR;
-      
-         status = hashTable->insert(file, PageNo, frameNo);
+    
+      status = hashTable->insert(file, PageNo, frameNo);
       if (status == HASHTBLERROR) return status; 
       
       bufTable[frameNo].Set(file, PageNo);
@@ -136,7 +136,7 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
       status = file->readPage(PageNo, pg); 
       if (status == HASHNOTFOUND) return UNIXERR;
       
-      bufTable[frameNo].refbit == true;
+      bufTable[frameNo].refbit = true;
       bufTable[frameNo].pinCnt++;
       page = pg; 
     }
@@ -180,15 +180,37 @@ const Status BufMgr::unPinPage(File* file, const int PageNo,
     return OK;
 }
 
+/*This call is kind of weird.  The first step is to to allocate an empty page in the specified file by invoking the 
+file->allocatePage() method. This method will return the page number of the newly allocated page.  Then allocBuf() 
+is called to obtain a buffer pool frame.  Next, an entry is inserted into the hash table and Set() is invoked on 
+the frame to set it up properly.  The method returns both the page number of the newly allocated page to the caller
+via the pageNo parameter and a pointer to the buffer frame allocated for the page via the page parameter. 
+Returns OK if no errors occurred, UNIXERR if a Unix error occurred, BUFFEREXCEEDED if all buffer frames are pinned 
+and HASHTBLERROR if a hash table error occurred. */
+
 const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page) 
 {
 
+    //allocate a new page in the file
+    Status status = file->allocatePage(pageNo);
+    if (status != OK) return status;
 
+    //allocate a buffer frame
+    int frameNo;
+    status = allocBuf(frameNo);
+    if (status != OK) return status;
 
+    //insert the page into the hash table
+    status = hashTable->insert(file, pageNo, frameNo);
+    if (status == HASHTBLERROR) return status;
 
+    //set up the buffer frame
+    bufTable[frameNo].Set(file, pageNo);
 
+    //return the allocated page pointer
+    page = &bufPool[frameNo];
 
-
+    return OK;
 }
 
 const Status BufMgr::disposePage(File* file, const int pageNo) 
