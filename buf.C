@@ -72,14 +72,13 @@ const Status BufMgr::allocBuf(int & frame)
         if (buf.refbit) {
             buf.refbit = false;
         } else if (buf.pinCnt == 0) { // Unppinned frame found
-            found = true;
             frame = clockHand; // Store the allocated frame number
 
             if (buf.valid) {
-                hashTable.remove(buf.file, buf.pageNo);
+                hashTable->remove(buf.file, buf.pageNo);
 
                 if (buf.dirty) { // Write the dirty page to disk
-                    if (buf.file->writePage(buf->pageNo, &(bufPool[frame])) != OK) {
+                    if (buf.file->writePage(buf.pageNo, &(bufPool[frame])) != OK) {
                         return UNIXERR;
                     }
                     buf.dirty = false;
@@ -136,7 +135,7 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
       status = file->readPage(PageNo, pg); 
       if (status == HASHNOTFOUND) return UNIXERR;
       
-      bufTable[frameNo].refbit == true;
+      bufTable[frameNo].refbit = true;
       bufTable[frameNo].pinCnt++;
       page = pg; 
     }
@@ -261,5 +260,3 @@ void BufMgr::printSelf(void)
         cout << endl;
     };
 }
-
-
