@@ -64,36 +64,46 @@ BufMgr::~BufMgr() {
 
 const Status BufMgr::allocBuf(int & frame) 
 {
-    int startHand = clockHand; // Save the starting point
+    int startHand = clockHand;
+    bool checkedAll = false;
 
-    do {
-        BufDesc &buf = bufTable[clockHand]; // Current candidate frame
+    while (true) {
+        BufDesc &buf = bufTable[clockHand];
 
         if (buf.refbit) {
+            // Clear reference bit and give the frame another chance
             buf.refbit = false;
-        } else if (buf.pinCnt == 0) { // Unppinned frame found
-            frame = clockHand; // Store the allocated frame number
+        } else if (buf.pinCnt == 0) {
+            // Found an unpinned frame; allocate it
+            frame = clockHand;
 
+            // Flush and clear existing page if necessary
             if (buf.valid) {
                 hashTable->remove(buf.file, buf.pageNo);
-
-                if (buf.dirty) { // Write the dirty page to disk
-                    if (buf.file->writePage(buf.pageNo, &(bufPool[frame])) != OK) {
+                if (buf.dirty) {
+                    Status status = buf.file->writePage(buf.pageNo, &(bufPool[frame]));
+                    if (status != OK) 
                         return UNIXERR;
-                    }
-                    buf.dirty = false;
                 }
             }
-            buf.Clear();
+
+            buf.Clear(); 
             advanceClock();
             return OK;
         }
 
         advanceClock();
-    } while (clockHand != startHand);
 
-    return BUFFEREXCEEDED;
-
+        // After a full pass, check if all frames are pinned
+        if (clockHand == startHand) {
+            if (checkedAll) {
+                // All frames are pinned; return error
+                return BUFFEREXCEEDED;
+            } else {
+                checkedAll = true;  // Mark that we've checked all frames once
+            }
+        }
+    }
 }
 
 /*
