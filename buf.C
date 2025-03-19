@@ -121,8 +121,7 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
       if (status != OK) return status;
     
       //read page from disk into buffer pool
-      Page* pg;
-      status = file->readPage(PageNo, pg); 
+      status = file->readPage(PageNo, &bufPool[frameNo]); 
       if (status == HASHNOTFOUND) return UNIXERR;
     
       //insert page into hashtable
@@ -133,17 +132,14 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
       bufTable[frameNo].Set(file, PageNo);
       
       //return pointer to frame containing page
-      page = pg;
+      page = &bufPool[frameNo];
     } else // case 2 (page is in buffer pool)
     {
-      Page* pg;
-      status = file->readPage(PageNo, pg); 
-      if (status == HASHNOTFOUND) return UNIXERR;
+      //return pointer to frame containing page
+      page = &bufPool[frameNo];
       //set refbit and increment pincnt if successfully read
       bufTable[frameNo].refbit = true;
       bufTable[frameNo].pinCnt++;
-      //return pointer to frame containing page
-      page = pg; 
     }
     return OK;
 }
