@@ -97,20 +97,50 @@ const Status BufMgr::allocBuf(int & frame)
 
 }
 
-
-
-
-
-
-
+/*
+ * First check whether the page is already in the buffer pool by invoking the lookup() method on the hashtable to get a frame number.  
+ * There are two cases to be handled depending on the outcome of the lookup() call:
+ * Case 1) Page is not in the buffer pool.  
+ *	Call allocBuf() to allocate a buffer frame and then call the method file->readPage() to read the page from disk into the buffer pool frame. 
+ * 	Next, insert the page into the hashtable. Finally, invoke Set() on the frame to set it up properly. Set() will leave the pinCnt for the page set to 1.  
+ * 	Return a pointer to the frame containing the page via the page parameter.
+ * Case 2)  Page is in the buffer pool.  
+ * 	In this case set the appropriate refbit, increment the pinCnt for the page, and then return a pointer to the frame containing the page via the page parameter.
+ * 
+ * 	Returns OK if no errors occurred, UNIXERR if a Unix error occurred, BUFFEREXCEEDED if all buffer frames are pinned, HASHTBLERROR if a hash table error occurred.
+ */
 	
 const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
 {
-
-
-
-
-
+    int frameNo = 0;
+    Status status = hashTable->lookup(file, PageNo, frameNo);
+       
+    if (status == HASHNOTFOUND)  // case 1
+    {
+      status = allocBuf(frameNo);
+      if (status != OK) return status;
+    
+      Page* pg;
+      status = file->readPage(PageNo, pg); 
+      if (status == HASHNOTFOUND) return UNIXERR;
+      
+         status = hashTable->insert(file, PageNo, frameNo);
+      if (status == HASHTBLERROR) return status; 
+      
+      bufTable[frameNo].Set(file, PageNo);
+      
+      page = pg;
+    } else // case 2 
+    {
+      Page* pg;
+      status = file->readPage(PageNo, pg); 
+      if (status == HASHNOTFOUND) return UNIXERR;
+      
+      bufTable[frameNo].refbit == true;
+      bufTable[frameNo].pinCnt++;
+      page = pg; 
+    }
+    return OK;
 }
 
 
@@ -124,7 +154,7 @@ const Status BufMgr::unPinPage(File* file, const int PageNo,
     // Check if (file,pageNo) is currently in the buffer pool (ie. in
     // the hash table.  If so, return the corresponding frameNo via the frameNo
     // parameter.  Else, return HASHNOTFOUND
-    unpinPageStatus = hashTable->lookup(file, pageNo, unPinFrameNo);
+    unpinPageStatus = hashTable->lookup(file, PageNo, unPinFrameNo);
 
     if (unpinPageStatus != OK) {
         //Returns: HASHNOTFOUND if the page is not in the buffer pool hash table, 
