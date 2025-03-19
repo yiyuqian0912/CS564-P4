@@ -108,7 +108,8 @@ const Status BufMgr::allocBuf(int & frame)
  * 
  * 	Returns OK if no errors occurred, UNIXERR if a Unix error occurred, BUFFEREXCEEDED if all buffer frames are pinned, HASHTBLERROR if a hash table error occurred.
  */
-	
+
+ //Matthew Lee
 const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
 {
     int frameNo = 0;
@@ -188,6 +189,8 @@ the frame to set it up properly.  The method returns both the page number of the
 via the pageNo parameter and a pointer to the buffer frame allocated for the page via the page parameter. 
 Returns OK if no errors occurred, UNIXERR if a Unix error occurred, BUFFEREXCEEDED if all buffer frames are pinned 
 and HASHTBLERROR if a hash table error occurred. */
+
+//Matthew Lee
 
 const Status BufMgr::allocPage(File* file, int& pageNo, Page*& page) 
 {
