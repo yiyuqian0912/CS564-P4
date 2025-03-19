@@ -72,14 +72,13 @@ const Status BufMgr::allocBuf(int & frame)
         if (buf.refbit) {
             buf.refbit = false;
         } else if (buf.pinCnt == 0) { // Unppinned frame found
-            //found = true;
             frame = clockHand; // Store the allocated frame number
 
             if (buf.valid) {
                 hashTable->remove(buf.file, buf.pageNo);
 
                 if (buf.dirty) { // Write the dirty page to disk
-                    if (buf.file->writePage(buf->pageNo, &(bufPool[frame])) != OK) {
+                    if (buf.file->writePage(buf.pageNo, &(bufPool[frame])) != OK) {
                         return UNIXERR;
                     }
                     buf.dirty = false;
@@ -115,29 +114,35 @@ const Status BufMgr::readPage(File* file, const int PageNo, Page*& page)
     int frameNo = 0;
     Status status = hashTable->lookup(file, PageNo, frameNo);
        
-    if (status == HASHNOTFOUND)  // case 1
+    if (status == HASHNOTFOUND)  // case 1 (page not in buffer pool)
     {
+      //allocate buffer frame  
       status = allocBuf(frameNo);
       if (status != OK) return status;
     
+      //read page from disk into buffer pool
       Page* pg;
       status = file->readPage(PageNo, pg); 
       if (status == HASHNOTFOUND) return UNIXERR;
     
+      //insert page into hashtable
       status = hashTable->insert(file, PageNo, frameNo);
       if (status == HASHTBLERROR) return status; 
       
+      //set up frame properly
       bufTable[frameNo].Set(file, PageNo);
       
+      //return pointer to frame containing page
       page = pg;
-    } else // case 2 
+    } else // case 2 (page is in buffer pool)
     {
       Page* pg;
       status = file->readPage(PageNo, pg); 
       if (status == HASHNOTFOUND) return UNIXERR;
-      
+      //set refbit and increment pincnt if successfully read
       bufTable[frameNo].refbit = true;
       bufTable[frameNo].pinCnt++;
+      //return pointer to frame containing page
       page = pg; 
     }
     return OK;
@@ -283,5 +288,3 @@ void BufMgr::printSelf(void)
         cout << endl;
     };
 }
-
-
